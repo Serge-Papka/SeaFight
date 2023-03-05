@@ -63,15 +63,13 @@ try:
                 line_pole = []
 
         def add_ship(self):
-
             for ship in self.ships:
                 steam = list(input(
                     f"Установка {ship}-клеточного корабля.\n"
                     f"Введите корды носа(En) от A1 до {chr(64 + cells)}{cells} : "))
                 steam = remove_mistakes(steam)
                 print(steam)
-
-
+                Новый_корабль_для_поля_B1 = Ship(length=ship., stem=steam, rotate=0, hp=ship)
             # self.A
             pass
 
