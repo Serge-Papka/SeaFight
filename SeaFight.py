@@ -1,17 +1,17 @@
-from random import randint
+from random import randint, randrange
 import time
 
-cells = 4  # Поле 6*6
+cells = 6  # Поле 6*6
+think_time_pc = 1
+difficult = 2  # 1='easy', 2='normal', 3='hardcore'
+# Хардкор заработает, когда пройдёшь игру на normal...(joke.не заработает, он еще не создан))
 
-free_block = round((cells ** 2) / 9)  # Тестовый конструктор кораблей поля, для поля 6*6 = [3, 2, 2, 1, 1, 1, 1]
+free_block = round((cells ** 2) / 9)  # Конструктор кораблей поля, для поля 6*6 = [3, 2, 2, 1, 1, 1, 1]
 ships_pattern = [1] + [1] * (free_block + round(cells / 2) - 1)
 while free_block >= 1:
     for i in range(round(free_block * 0.75)):
         ships_pattern[i] += 1
         free_block -= 1
-# print(ships_pattern)
-
-think_time_pc = 3
 
 
 class MyExceptions(Exception):
@@ -29,21 +29,7 @@ class DoubleShoot(MyExceptions):
 
 
 class ShipCantPlace(MyExceptions):
-    # def __str__(self):  # Удалить перед сдачей
-    #     return "Тест ошибка постановки корабля"  # Удалить перед сдачей
     pass
-
-
-# class Dot:    # В игре не использовал этот класс, вместо него функция change_to_dot()
-#     def __init__(self, x, y):
-#         self.x = x
-#         self.y = y
-#
-#     def __eq__(self, other):
-#         return self.x == other.x and self.y == other.y
-#
-#     def __str__(self):
-#         return f'Dot: {self.x, self.y}'
 
 
 class Ship:
@@ -57,7 +43,6 @@ class Ship:
             print(rotate)
             print("Поворот Не от 0 до 4")
 
-    # @property
     def dots(self):
         dots_ship = []
         for i in range(self.length):
@@ -70,16 +55,14 @@ class Ship:
             else:
                 dots_ship = dots_ship + [(self.bow[0], self.bow[1] - i)]
         return dots_ship
-        # huricane = Ship(2, (1, 1), 1)
-        # print(huricane.dots())
 
 
 def remove_mistakes(list_):  # Удаляю лишние символы и возвращаю буквы в верхнем регистре.
     miss = [' ', '-', '+', '*', '**', '/', '|', '=', '.', ",", '', '', '', '', ]
-    for i in miss:
+    for i_str in miss:
         while True:
-            if list_.count(i):
-                list_.remove(i)
+            if list_.count(i_str):
+                list_.remove(i_str)
             else:
                 break
     for i in range(len(list_)):
@@ -91,14 +74,10 @@ def change_to_dot(list_):
     if list_[1].isdigit():
         if not (list_[0].isdigit()):  # (буква,цифра)
             list_[0], list_[1] = int(list_[1]), ord(list_[0]) - 64
-            # print(list_,404)
         else:  # Если введут стандартные координаты (цифра,цифра)
             list_[0], list_[1] = int(list_[0]), int(list_[1])
     elif list_[0].isdigit():  # (цифра,буква)
         list_[0], list_[1] = int(list_[0]), ord(list_[1]) - 64
-    # else:  # (буква,буква) ?)    Раскомментировать 3 строчки , чтоб переводил 2 буквы в 2 циры
-    #     print(f"меняю {list_[1]} на {ord(list_[1])-64}")  #  раскомментировать
-    #     list_[0], list_[1] = ord(list_[1]) - 64, ord(list_[0]) - 64  #  раскомментировать
     list_ = (list_[0], list_[1])
     return list_
 
@@ -120,50 +99,42 @@ class Board:
         self.hid = hid  # 3. скрывать корабли
         self.alive_ships = alive_ships  # 4. Количество живых кораблей на доске.
         self.not_free = []  # Занятые клетки для строительства
-        self.shooten = []  # Прострелянные клетки
+        self.shot_through = []  # Прострелянные клетки
+        self.wounded = []  # Раненый
 
     def add_ship(self, ship):
-        for i in ship.dots():
-            if self.out(i):
+        for i_dot in ship.dots():
+            if self.out(i_dot):
                 raise ShipCantPlace
-            if i in self.not_free:
+            if i_dot in self.not_free:
                 raise ShipCantPlace
-        for i in ship.dots():
-            # print(self.pole[0][0])
-            self.pole[i[0]][i[1]] = "■"
-            # print('dfgdfgfdg',[i[0]], [i[1]])
-            self.not_free.append(i)
+        for i_dot in ship.dots():
+            self.pole[i_dot[0]][i_dot[1]] = "■"
+            self.not_free.append(i_dot)
         self.ships.append(ship)
         self.contour(ship)
 
     def contour(self, ship, marker="."):
         for center in ship.dots():
-            # print("Центр", center)
             for i in range(center[0] - 1, center[0] + 2):
                 for j in range(center[1] - 1, center[1] + 2):
-                    # print("Вот", i, j)
-                    if marker != "." and not (self.out((i, j))) and self.hid:
-                        if self.pole[i][j] == ".":
-                            self.pole[i][j] = marker
-                        ######pass
+                    if marker != "." and not (self.out((i, j))):
+                        if self.hid:  # нам обводить убитые, но не запрещать стрелять; компу запрещать, но не обводить.
+                            if self.pole[i][j] == ".":
+                                self.pole[i][j] = marker
+                        else:
+                            if difficult > 1:
+                                if not ((i, j) in self.shot_through):
+                                    self.shot_through.append((i, j))
                     if not ((self.out((i, j))) or ((i, j) in self.not_free)):
-                        # print("Аут в контуре:", self.out((i, j)))
-                        # print((i, j) in self.not_free)
-
-                        # print((i, j))
                         self.pole[i][j] = marker
                         self.not_free.append((i, j))
-                        # print(self.not_free)
 
-    # for ship in self.ships:
-    #     steam = list(input(
-    #         f"Установка {ship}-клеточного корабля.\n"
-    #         f"Введите корды носа(En) от A1 до {chr(64 + cells)}{cells} : "))
-    #     steam = remove_mistakes(steam)
-    #     print(steam)
-    #     # Новый_корабль_для_поля_B1 = Ship(length=ship., stem=steam, hp=ship)
-    # # self.A
-    # pass
+    def contour_d(self, x, y):
+        for ip in [-1, 1]:
+            for jp in [-1, 1]:
+                if not ((self.out((x + ip, y + jp))) or ((x + ip, y + jp) in self.shot_through)):
+                    self.shot_through.append((x + ip, y + jp))
 
     def __str__(self):
         show = ''
@@ -172,62 +143,48 @@ class Board:
                 point = self.pole[i][j]
                 point = point.replace(".", " ")
                 if self.hid:
-                    # print('1wwewq')
                     point = point.replace("■", " ")
-                    # print (point)
                 if i == 0:
                     show = show + ''.join(point) + '   '
                 else:
-                    if j == 0 and len(value_2) > 1:  # Уменьшить отступ для 2х значных чисел шапки
+                    if j == 0 and len(value_2) > 1:  # Уменьшить отступ для 2-х значных чисел шапки
                         show = show + ''.join(point) + '| '
                     else:
                         show = show + ''.join(point) + ' | '
             show = show + '\n'
         return show[:-2] + ' '
 
-    def out(self, point):
-        # print(point, 666)
-        # print(point[0])
-        # print(point[1])
-        # print(0 < point[0] <= cells)
-        # print(0 < point[1] <= cells)
-        # print(not ((0 < point[0] <= cells) and (0 < point[1] <= cells)))
-        # print("Точка аута:", not ((0 < point[0] <= cells) and (0 < point[1] <= cells)))
+    @staticmethod
+    def out(point):
         return not ((0 < point[0] <= cells) and (0 < point[1] <= cells))
 
     def shot(self, point):
         player = ("    " * (cells + 3) + "Игрок") if self.hid else "\nКомп"
         if self.out(point):
             raise BoardOutException
-        if point in self.shooten:
+        if point in self.shot_through:
             raise DoubleShoot
-        self.shooten.append(point)
+        self.shot_through.append(point)
         for ship in self.ships:
-            # print(point, 1)
-            # print(ship.dots(), 2)
-            # print(ship.hp, 3)
             if point in ship.dots():
                 ship.hp -= 1
-                # print(self.pole)
-                # print('fghfgh',(point[0], point[1]))
-                # print(self.pole[0][0])
-                # print(self.pole[point[0]][point[1]])#= "fgdhdfghdfg"
+                if not self.hid:
+                    if difficult > 1:
+                        self.contour_d(point[0], point[1])
                 self.pole[point[0]][point[1]] = 'x'
                 if ship.hp == 0:
                     self.alive_ships -= 1
                     print(f"{player} стрельнул {chr(point[1] + 64)}{point[0]} - убил!")
                     self.contour(ship, marker='°')  # °
-                    # if not self.hid:
-                    #     gamer.show()
-                    #     time.sleep(think_time_pc)
+                    if not self.hid:
+                        self.wounded = []  # обнуление раненого
                     if self.alive_ships == 0:
                         return False
                     return True
                 else:
                     print(f"{player} стрельнул {chr(point[1] + 64)}{point[0]} - попал!")
-                    # if not self.hid:
-                    #     gamer.show()
-                    #     time.sleep(think_time_pc)
+                    if not self.hid:
+                        self.wounded.append((point[0], point[1]))
                     return True
         self.pole[point[0]][point[1]] = '·'
         print(f"{player} стрельнул {chr(point[1] + 64)}{point[0]} - мимо!")
@@ -241,7 +198,6 @@ class Player:
 
     def ask(self):
         print('Этот метод переопределён')
-        # raise NotImplementedError()
 
     def move(self):
         while True:
@@ -251,26 +207,43 @@ class Player:
                     point = self.ask()
                     repeater = self.board_enemy.shot(point)
                     gamer.show()
-                    # print(repeater,67)
-                    # print(self.board_player.hid,67)
-                    # print(repeater and self.board_player.hid)
-                    # print(not(repeater and self.board_player.hid))
+                    if self.board_enemy.alive_ships == 0:
+                        return False
 
                     if (repeater and self.board_player.hid) or not (repeater or self.board_player.hid):
-                        # print('67')
                         time.sleep(think_time_pc)
-                    # print(self.board_player.hid)
-                    # gamer.show()
+                    if not repeater:
+                        return False
                 except MyExceptions as e:
-                    print(e, "123")
+                    if not self.board_player.hid:  # В ход компа не выводить ошибки.
+                        print(e)
 
 
-#
 class AI(Player):
     def ask(self):
         while True:
-            shot = (randint(1, cells), randint(1, cells))
-            # print(f"Ход компьютера: {chr(shot[1] + 64)} {shot[0]} ")
+            if gamer.board_user.wounded and difficult > 1:  # есть раненый
+                if len(gamer.board_user.wounded) == 1:
+                    dot = (gamer.board_user.wounded[0][0], gamer.board_user.wounded[0][1])
+                    rnd = randint(0, 1)
+                    if rnd == 1:
+                        shot = (dot[0] + randrange(-1, 2, 2), dot[1])
+                    else:
+                        shot = (dot[0], dot[1] + randrange(-1, 2, 2))
+                else:
+                    len_ = len(gamer.board_user.wounded)
+                    dot = (gamer.board_user.wounded[0][0], gamer.board_user.wounded[0][1])
+                    dot2 = (gamer.board_user.wounded[len_ - 1][0], gamer.board_user.wounded[len_ - 1][1])
+                    if dot[0] == dot2[0]:  # раненый корабль горизонтальный
+                        if dot[1] > dot2[1]:
+                            dot, dot2 = dot2, dot  # ставлю по возрастанию
+                        shot = (dot[0], (randrange(dot[1] - 1, dot2[1] + 2, len_ + 1)))
+                    else:
+                        if dot[0] > dot2[0]:
+                            dot, dot2 = dot2, dot
+                        shot = ((randrange(dot[0] - 1, dot2[0] + 2, len_ + 1)), dot[1])
+            else:
+                shot = (randint(1, cells), randint(1, cells))
             return shot
 
 
@@ -313,7 +286,6 @@ class User(Player):
             if isinstance(shot[0], str) and isinstance(shot[1], str):
                 print("Нужно хотя бы 1 цифру")
                 continue
-            # print(shot, 44)
             return shot
 
 
@@ -332,14 +304,14 @@ class Game:
             for len_ in ships_pattern:
                 counter = 0
                 while True:
-                    ship = Ship(length=len_, bow=(randint(1, cells), randint(1, cells)), rotate=randint(0, 1))
-                    # print(len_,counter, ship.dots())
+                    ship = Ship(length=len_, bow=(randint(1, cells), randint(1, cells)),
+                                rotate=randint(0, 1))
                     try:
                         counter += 1
                         bord.add_ship(ship)
                         correct += 1
                         break
-                    except ShipCantPlace as e:
+                    except ShipCantPlace:
                         pass
                     if counter >= 2000:
                         break
@@ -347,8 +319,6 @@ class Game:
                     break
             if correct == len(ships_pattern):
                 break
-        # print(bord.ships.__str__())
-        # print(bord.alive_ships)
         return bord
 
     def show(self):
@@ -365,21 +335,16 @@ class Game:
         self.show()
 
     def loop(self):
-        while True:  # self.board_user.alive_ships > 0 and self.board_pc.alive_ships > 0:
+        while True:
             self.user.move()
-            print('sdddddddddddddddddddffffffffdsfsdfdsf')
             if self.board_pc.alive_ships == 0:
                 print("Победил игрок")
                 return
-            print(self.board_user.alive_ships, 'self.board_user.alive_ships')
-            print(self.board_pc.alive_ships, ' self.board_pc.alive_ships')
 
             self.pc.move()
             if self.board_user.alive_ships == 0:
-                print(""    " * (cells - 1) + Победил комп")
+                print("    " + "    " * cells * 2 + "Победил комп")
                 break
-            print(self.board_user.alive_ships, 'self.board_user.alive_ships')
-            print(self.board_pc.alive_ships, ' self.board_pc.alive_ships')
 
     def start(self):
         self.greet()
@@ -388,32 +353,3 @@ class Game:
 
 gamer = Game()
 gamer.start()
-
-#
-# B1 = Board()
-# B2 = Board()
-# # print(str(B1))
-# ship55 = Ship(5, (3, 5), 3)
-# # print(ship55.dots())
-#
-# B1.add_ship(ship55)
-# # print(B1.not_free)
-#
-#
-# # print(B1.ship_l)
-# # print(B1.ships)
-# # print(str(B1))
-# # B1.shot((3,1))
-# # B1.shot((3,2))
-# # B1.shot((3,3))
-# # B1.shot((3,4))
-# # B1.shot((3,5))
-# #
-# #
-# # B1.shot((5,1))
-# # print(B1.shooten)
-# im = User(B1, B2)
-# im.move()
-# print(str(B1))
-# print(str(B2))
-print("Конец")
