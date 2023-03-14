@@ -1,9 +1,9 @@
 from random import randint, randrange
 import time
 
-cells = 6  # Поле 6*6
-think_time_pc = 1
-difficult = 2  # 1='easy', 2='normal', 3='hardcore'
+cells = 10  # Поле 6*6
+think_time_pc = 2
+difficult = 3  # 1='easy', 2='normal', 3='hardcore'
 # Хардкор заработает, когда пройдёшь игру на normal...(joke.не заработает, он еще не создан))
 
 free_block = round((cells ** 2) / 9)  # Конструктор кораблей поля, для поля 6*6 = [3, 2, 2, 1, 1, 1, 1]
